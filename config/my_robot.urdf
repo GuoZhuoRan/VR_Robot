@@ -1,0 +1,44 @@
+<robot name="my_robot">
+  <!-- Define robot links and joints here -->
+
+  <!-- Add camera link and sensor -->
+  <link name="camera_link">
+    <visual>
+      <!-- Define camera visual representation if needed -->
+    </visual>
+    <collision>
+      <!-- Define collision properties if needed -->
+    </collision>
+    <inertial>
+      <!-- Define inertial properties if needed -->
+    </inertial>
+    <sensor name="camera_sensor" type="camera">
+      <camera>
+        <horizontal_fov>1.047</horizontal_fov>
+        <image>
+          <width>640</width>
+          <height>480</height>
+          <format>R8G8B8</format>
+        </image>
+        <clip>
+          <near>0.01</near>
+          <far>100</far>
+        </clip>
+      </camera>
+      <plugin name="camera_controller" filename="libgazebo_ros_camera.so">
+        <alwaysOn>true</alwaysOn>
+        <updateRate>30.0</updateRate>
+        <cameraName>rrbot/camera1</cameraName>
+        <imageTopicName>image_raw</imageTopicName>
+        <cameraInfoTopicName>camera_info</cameraInfoTopicName>
+        <frameName>camera_link</frameName>
+        <hackBaseline>0.07</hackBaseline>
+        <distortionK1>0.0</distortionK1>
+        <distortionK2>0.0</distortionK2>
+        <distortionK3>0.0</distortionK3>
+        <distortionT1>0.0</distortionT1>
+        <distortionT2>0.0</distortionT2>
+      </plugin>
+    </sensor>
+  </link>
+</robot>

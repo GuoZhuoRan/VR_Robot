@@ -1,0 +1,5 @@
+<launch>
+    <node pkg="my_python_package" type="pub_tf2.py" name="my_python_node" output="screen">
+        <!-- Add any node-specific parameters here if needed -->
+    </node>
+</launch>
