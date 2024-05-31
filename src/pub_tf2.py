@@ -335,9 +335,13 @@ class TFPublisher:
         left_data=np.array(float_array[16:32])
         right_data=np.array(float_array[32:48])
 
+
+
         head_data=head_data.reshape((4,4))
         left_data=left_data.reshape((4,4))
         right_data=right_data.reshape((4,4))
+
+        head_data[:3,:3]=np.eye(3)
 
         head_data_t=head_data[:3,-1]
         left_data_t=left_data[:3,-1]
