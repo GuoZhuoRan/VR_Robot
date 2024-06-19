@@ -15,8 +15,30 @@ import socket
 import struct
 import cv2
 
-left_lim = []
-right_lim = []
+import threading
+
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+from scipy.spatial.transform import Rotation
+
+left_lim = np.zeros((4,4))
+right_lim = np.zeros((4,4))
+# left:up_lim_min = [-300:300,100:600,-150:500] 
+# right:up_lim_min=[-300:300,-600:-100,-150:500]
+
+running = False
+
+
+
+
+def save_head_array(float_array):
+
+    while running:
+
+        if isinstance(float_array, tuple):
+               float_array = np.array(float_array)
+    
+        np.save('/home/guozhuoran/catkin_ws/head_re_matrix.npy',float_array.reshape(4,4))
 
 def lim_angle(angle):
         
@@ -255,6 +277,23 @@ class TFPublisher:
 
         self.data={}
         self.data_len_f=0
+
+        #Guozi:set boundaries
+
+        # self.x_min = -0.426
+        # self.x_max =0.464
+        # self.len_x =self.x_max - self.x_min
+        # self.y_min = 0.152
+        # self.y_max = 0.438 
+        # self.len_y = self.y_max - self.y_min    
+        # self.z_min = 1.00
+        # self.z_max = 1.80
+        # self.len_z = self.z_max-self.z_min
+        
+
+        # left:[-300:300,100:600,-150:500]
+        # right:[-300:300,-600:-100,-150:500]
+
         while not rospy.is_shutdown():
             # print("1111111")
             data_bytes, addr = sock.recvfrom(self.BUFFER_SIZE)####receive
@@ -265,13 +304,32 @@ class TFPublisher:
                 break
 
             l = len(data_bytes)
-            print("1234455",l)
+            #print("1234455",l)
             if l==16*4*53:
                 # Unpack the received data into a float array
                 # print(f'databytes is {data_bytes}')
                 float_array = struct.unpack('848f', data_bytes)
-                print('init!')
+
+                # self.bounding_box = {
+                #     "length": np.array([self.len_x,self.len_y,self.len_z]),
+                #     "rotation":np.array(float_array[:16]).reshape(4,4)[:3,:3]
+                # }
+            
+                # print('----------------registration-----------')
+                self.register(float_array)
                 self.process_vision_pro_data(float_array)
+
+
+                # if self.is_point_in_rotated_bounding_box(np.array(float_array[16:32]).reshape(4,4),
+                                                            # np.array(float_array[32:48]).reshape(4,4)):
+                    # print("-----start vision pro processing!----------------")
+                    
+                    # self.process_vision_pro_data(float_array)
+                # else:
+                    # print('Error occurred!!!!!!')
+                    
+                
+
             
             
             
@@ -375,17 +433,85 @@ class TFPublisher:
         beta_y = (beta_y + np.pi) % (2 * np.pi) - np.pi
         alpha_z = (alpha_z + np.pi) % (2 * np.pi) - np.pi
 
-        return np.array([alpha_z, beta_y, gamma_x])
+        return np.array([alpha_z, beta_y, gamma_x])        
 
- 
+    
+    def register(self,float_array):
+        global running
 
- 
+        print('------start saving head array-------')
+
+        # Initialize a named window
+        cv2.namedWindow("Test Window")
+
+        while True:
+            # Display an empty frame (you can replace this with your actual frame)
+            frame = cv2.imread("/home/guozhuoran/catkin_ws/example.jpg")  # Replace with your image path or capture from camera
+            cv2.imshow("Test Window", frame)
+
+            # Wait for a key press
+            key = cv2.waitKey(1) & 0xFF
+
+            # Start the function when 's' is pressed
+            if key == ord('s'):
+                if not running:
+                    running = True
+                    threading.Thread(target=save_head_array,args=(np.array(float_array[:16]),)).start()
+                    print("Started  registering.")
+
+            # Stop the function when 'q' is pressed
+            elif key == ord('q'):
+                if running:
+                    running = False
+                    print("Stopped registering.")
+
+            # Break the loop when 'esc' is pressed
+            elif key == 27:  # Esc key
+                break
+
+        # Release resources
+        cv2.destroyAllWindows()
+
+    from scipy.spatial.transform import Rotation
+
+    def is_point_in_rotated_bounding_box(self,left_hand,right_hand):
+        """
+        判断一个点是否在旋转后的3D边界框内。
+
+        :param point: 点的坐标，格式为 [x, y, z]
+        :param bounding_box: 旋转后的边界框，定义为一个字典，包含旋转矩阵和边界框的尺寸
+                             {'rotation_matrix': rotation_matrix, 'length': [length_x, length_y, length_z]}
+        :return: 如果点在旋转后的边界框内，返回True；否则返回False
+        """
+        # 获取旋转矩阵和边界框尺寸
+        rotation_matrix = self.bounding_box['rotation']
+        length = self.bounding_box['length']
+
+        # 点的坐标转换到旋转后的边界框的本地坐标系
+        point_local_left = np.linalg.inv(rotation_matrix) @ left_hand[:3,-1]
+        point_local_right = np.linalg.inv(rotation_matrix) @ right_hand[:3,-1]
+
+        # 判断点是否在边界框的本地坐标系内
+        in_x_l = 0 <= point_local_left[0] <= length[0]
+        in_y_l = 0 <= point_local_left[1] <= length[1]
+        in_z_l = 0 <= point_local_left[2] <= length[2]
+        
+        in_x_r = 0 <= point_local_right[0] <= length[0]
+        in_y_r = 0 <= point_local_right[1] <= length[1]
+        in_z_r = 0 <= point_local_right[2] <= length[2]
+
+
+        return in_x_l and in_y_l and in_z_l and in_x_r and in_y_r and in_z_r
+        
+
+      
 
 
     def process_vision_pro_data(self,float_array):
-        print('begin processing!')
+        print('--------------begin  visionpro processing!-------------')
         head_data=np.array(float_array[:16])
-        # head_data = np.load('/home/guozhuoran/catkin_ws/head_matrix.npy')
+# 
+        # head_data = np.load('/home/guozhuoran/catkin_ws/head_re_matrix.npy')
         left_data=np.array(float_array[16:32])
         right_data=np.array(float_array[32:48])
         left_fin_data_1=np.array(float_array[64:80])
@@ -401,11 +527,7 @@ class TFPublisher:
         right_fin_data_4=np.array(float_array[(48+25*16)+11*16:(48+25*16)+12*16])
         right_fin_data_5=np.array(float_array[(48+25*16)+16*16:(48+25*16)+17*16])
         right_fin_data_6=np.array(float_array[(48+25*16)+21*16:(48+25*16)+22*16])
-        
-
-
-        # print("11111111111111")
-        # print(right_fin_data_1)
+   
 
         left_fin_data_1=left_fin_data_1.reshape((4,4))
         left_fin_data_2=left_fin_data_2.reshape((4,4))
@@ -437,8 +559,6 @@ class TFPublisher:
         right_fin_data_6_xyz = matrix3d_to_euler_angles_zyx(right_fin_data_6)
 
 
-
-
         left_finger_1 = (left_fin_data_1_xyz[0]+0.65)/0.5*90
         left_finger_1 = lim_angle(left_finger_1)
 
@@ -457,7 +577,6 @@ class TFPublisher:
         left_finger_6 = (left_fin_data_6_xyz[0]+0.2)/1.2*90
         left_finger_6 = lim_angle(left_finger_6)
 
-        # print(right_fin_data_3_xyz)
         right_finger_1 = (right_fin_data_1_xyz[0]+0.65)/0.5*90
         right_finger_1 = lim_angle(right_finger_1)
 
@@ -481,23 +600,55 @@ class TFPublisher:
         # print(right_finger_1,right_finger_2,right_finger_3,right_finger_4,right_finger_5,right_finger_6)
 
         head_data=head_data.reshape((4,4))
-        left_data=left_data.reshape((4,4))
-        right_data=right_data.reshape((4,4))
-
         # head_data[:3,:3]=np.eye(3)
+        # left_data=left_data.reshape((4,4))
+        # right_data=right_data.reshape((4,4))
+
+        #Guozi: using global variables
+        left_lim = left_data.reshape((4,4))
+        right_lim= right_data.reshape((4,4))
+
+        print(f'left_lim is {left_lim},right_lim is {right_lim}')
+
 
         #left right positions
 
         head_data_t=head_data[:3,-1]
-        left_data_t=left_data[:3,-1]
-        right_data_t=right_data[:3,-1]
+        # left_data_t=left_data[:3,-1]
+        left_data_t=left_lim[:3,-1]
+
+        #Guozi:set limitations
+        # if left_lim[:3,-1][0]>=self.left_x_max:
+        #     left_lim[:3,-1][0]=self.left_x_max
+        # if left_lim[:3,-1][0]<=self.left_x_min:
+        #     left_lim[:3,-1][0]=self.left_x_min
+        # if left_lim[:3,-1][1]>=self.left_y_max:
+        #     left_lim[:3,-1][1]=self.left_y_max
+        # if left_lim[:3,-1][1]<=self.left_y_min:
+        #     left_lim[:3,-1][1]=self.left_y_min
+
+
+        # right_data_t=right_data[:3,-1]
+        right_data_t=right_lim[:3,-1]
+
+        #Guozi:set limitations
+        # if right_lim[:3,-1][0]>=self.right_x_max:
+        #     right_lim[:3,-1][0]=self.right_x_max
+        # if right_lim[:3,-1][0]<=self.right_x_min:
+        #     right_lim[:3,-1][0]=self.right_x_min
+        # if right_lim[:3,-1][1]>=self.right_y_max:
+        #     right_lim[:3,-1][1]=self.right_y_max
+        # if right_lim[:3,-1][1]<=self.right_y_min:
+        #     right_lim[:3,-1][1]=self.right_y_min
+
+        
 
         head_data_rpy = euler_from_matrix(head_data[:3,:3])
-        left_data_rpy = euler_from_matrix(left_data[:3,:3])
-        right_data_rpy = euler_from_matrix(right_data[:3,:3])
+        left_data_rpy = euler_from_matrix(left_lim[:3,:3])
+        right_data_rpy = euler_from_matrix(right_lim[:3,:3])
 
 
-        left_data_robot,right_data_robot,zyx_left_robot,zyx_right_robot =get_hand_tf(head_data,left_data,right_data)
+        left_data_robot,right_data_robot,zyx_left_robot,zyx_right_robot =get_hand_tf(head_data,left_lim,right_lim)
         # print(left_data_robot)
 
         left_wrist_t=left_data_robot[:3,-1]*1000
@@ -510,7 +661,7 @@ class TFPublisher:
             # -1.5708, 1.5708, 0,
             *left_wrist_t,1.0,
             # -500.0, 300, 100.0, 0.5233,
-            1.0,
+           1.0,
             # right
             # 0.0, 1.5708, 0.0,
             # 100.0, -200, 500.0, 0.0,
@@ -520,8 +671,8 @@ class TFPublisher:
                 0.0,
             ]
         
-        print("left_o:  ",*zyx_left_robot)
-        print("left_p:  ",*left_wrist_t)
+        #print("left_o:  ",*zyx_left_robot)
+        ##print("left_p:  ",*left_wrist_t)
         # message = [
         #     #
         #     *zyx_left_robot,
@@ -536,8 +687,6 @@ class TFPublisher:
         # 右臂外旋zyx欧拉角，xyz位置和臂形角bet夹爪状态
         # #print(message[0])
         self.udp_ik_sender.send(message)
-
-
 
     
         # tf_msg = create_tf_xyz_quat(float_array[1]/1000,float_array[2]/1000,float_array[3]/1000,float_array[4],float_array[5],float_array[6],float_array[7],'map',link)
@@ -563,6 +712,8 @@ class TFPublisher:
 
         rospy.sleep(0.00)
 
+        print("---visionpro process is done------------------")
+
 
 if __name__ == '__main__':
     
@@ -570,4 +721,6 @@ if __name__ == '__main__':
         rec = TFPublisher()
         ##print("123456")
         rec.publish_tf()
+
+
         

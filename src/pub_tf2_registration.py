@@ -13,10 +13,39 @@ import datetime
 import numpy as np
 import socket
 import struct
+import keyboard
+import time
 import cv2
 
-left_lim = []
-right_lim = []
+def save_file(float_array):
+
+    print(f'float array is :{float_array}')
+
+    print('start saving and registering')
+
+    image = cv2.imread('/home/guozhuoran/catkin_ws/example.jpg')
+
+    # Display the image in a window
+    cv2.imshow('Image', image)
+
+    np.save('/home/guozhuoran/catkin_ws/head_re_matrix.npy',float_array)
+
+    cv2.waitKey(0)
+
+    print('exit')
+
+    cv2.destroyAllWindows()
+
+    # Wait for the 'q' key to be pressed to end the program
+    # while True:
+    #     key = cv2.waitKey(1) & 0xFF
+    #     np.save('/home/guozhuoran/catkin_ws/head_matrix.npy',float_array)
+    #     print('save head file')
+
+    #     if key == ord('q'):
+    #         break
+    # return 
+
 
 def lim_angle(angle):
         
@@ -35,7 +64,7 @@ def create_tf_xyz_rpy(x,y,z,roll,pitch,yaw,parent,child):
     tf_msg.header.frame_id = parent # Parent frame
     tf_msg.child_frame_id = child # Child frame
 
-    # Set the initial position(x, y, z)
+    # Set the initial position (x, y, z)
     tf_msg.transform.translation.x = x
     tf_msg.transform.translation.y = y
     tf_msg.transform.translation.z = z
@@ -110,8 +139,8 @@ def calc_arm_angle(T_base_to_w, T_base_to_e, T_base_to_s):
 
 class UdpIkSender:
     def __init__(self):
-        self.client_host = "192.168.112.143"
-        self.client_port = 5005
+        self.client_host = "192.168.4.61"
+        self.client_port = 8010
         BUFFER_SIZE = 1024
 
         # 创建UDP套接字
@@ -121,7 +150,7 @@ class UdpIkSender:
         # client_socket.bind((client_host, client_port))
 
     def send(self, message):
-        packed_data = b''.join([struct.pack('>f', num) for num in message])#simulation >
+        packed_data = b''.join([struct.pack('<f', num) for num in message])
         self.client_socket.sendto(packed_data, (self.client_host, self.client_port))
         # #print('send')
 
@@ -146,17 +175,20 @@ def matrix3d_to_euler_angles_zyx(m3dr):
     beta_y = (beta_y + np.pi) % (2 * np.pi) - np.pi
     alpha_z = (alpha_z + np.pi) % (2 * np.pi) - np.pi
 
-    return np.array([alpha_z, beta_y, gamma_x])
-######################################################
+    return np.array([alpha_z, beta_y, gamma_x])  
 
-def get_hand_tf(group_to_head,group_to_left_hand,group_to_right_hand):
 
-    head_to_left_S = np.array([[1, 0, 0, -0.2],
+
+
+def get_hand_tf(vis_to_head,vis_to_left_hand,vis_to_right_hand):
+    
+    
+    head_to_left_shoulder = np.array([[1, 0, 0, -0.2],
                             [0, 1, 0, -0.15],
                             [0, 0, 1, -0.25],
                             [0, 0, 0, 1]])
 
-    head_to_right_S = np.array([[1, 0, 0, 0.13],
+    head_to_right_shoulder = np.array([[1, 0, 0, 0.2],
                             [0, 1, 0, -0.15],
                             [0, 0, 1, -0.25],
                             [0, 0, 0, 1]])
@@ -186,10 +218,10 @@ def get_hand_tf(group_to_head,group_to_left_hand,group_to_right_hand):
         [0.0000000,  0.0000000, 1.0000000, 0],
         [0, 0, 0, 1]])
 
-    should_to_hand_left = np.linalg.inv(should_to_sun_left_should)@np.linalg.inv(head_to_left_S)@np.linalg.inv(group_to_head)@group_to_left_hand@hand_to_sun_left_hand
+    should_to_hand_left = np.linalg.inv(should_to_sun_left_should)@np.linalg.inv(head_to_left_shoulder)@np.linalg.inv(vis_to_head)@vis_to_left_hand@hand_to_sun_left_hand
 
 
-    should_to_hand_right = np.linalg.inv(should_to_sun_right_should)@np.linalg.inv(head_to_right_S)@np.linalg.inv(group_to_head)@group_to_right_hand@hand_to_sun_right_hand
+    should_to_hand_right = np.linalg.inv(should_to_sun_right_should)@np.linalg.inv(head_to_right_shoulder)@np.linalg.inv(vis_to_head)@vis_to_right_hand@hand_to_sun_right_hand
 
     zyx_left=matrix3d_to_euler_angles_zyx(should_to_hand_left)
     zyx_right=matrix3d_to_euler_angles_zyx(should_to_hand_right)
@@ -221,7 +253,13 @@ def calc_arm_angle2(p_right_wrist, p_right_elbow, p_right_shoulder):
 
 class TFPublisher:
     def __init__(self):
-        rospy.init_node('tf_publisher')
+
+        # print(1234567890)
+
+        # rospy.init_node('tf_publisher')
+        rospy.init_node('tf_publisher',anonymous=True)
+
+        # print('596i4509u401u23091u0')
         # print("asdfagehbr")
         # Create a TF broadcaster
         self.tf_broadcaster = tf2_ros.TransformBroadcaster()
@@ -265,12 +303,12 @@ class TFPublisher:
                 break
 
             l = len(data_bytes)
-            print("1234455",l)
+            # print("1234455",l)
             if l==16*4*53:
                 # Unpack the received data into a float array
                 # print(f'databytes is {data_bytes}')
                 float_array = struct.unpack('848f', data_bytes)
-                print('init!')
+                # self.re_shoulder_tf(float_array)
                 self.process_vision_pro_data(float_array)
             
             
@@ -378,14 +416,29 @@ class TFPublisher:
         return np.array([alpha_z, beta_y, gamma_x])
 
  
+    #Guozi:registration_Matrix calculation
+    
 
- 
+    def re_shoulder_tf(self,float_array): 
+
+        # print('11111111111111111111111111111111111111111111111111111')
+
+        vis_to_head = np.array(float_array[:16]).reshape(4,4) 
+
+        save_file(vis_to_head)
+
+        # while cv2.waitKey(1) & 0xFF != ord('q'):
+        #     pass
+
+        # print('-------------save file succeed!--------------------------') 
+
+       
+
 
 
     def process_vision_pro_data(self,float_array):
-        print('begin processing!')
+
         head_data=np.array(float_array[:16])
-        # head_data = np.load('/home/guozhuoran/catkin_ws/head_matrix.npy')
         left_data=np.array(float_array[16:32])
         right_data=np.array(float_array[32:48])
         left_fin_data_1=np.array(float_array[64:80])
@@ -420,6 +473,8 @@ class TFPublisher:
         right_fin_data_4=right_fin_data_4.reshape((4,4))
         right_fin_data_5=right_fin_data_5.reshape((4,4))
         right_fin_data_6=right_fin_data_6.reshape((4,4))
+
+
         
 
         left_fin_data_1_xyz = matrix3d_to_euler_angles_zyx(left_fin_data_1)
@@ -486,8 +541,6 @@ class TFPublisher:
 
         # head_data[:3,:3]=np.eye(3)
 
-        #left right positions
-
         head_data_t=head_data[:3,-1]
         left_data_t=left_data[:3,-1]
         right_data_t=right_data[:3,-1]
@@ -504,34 +557,31 @@ class TFPublisher:
         right_wrist_t=right_data_robot[:3,-1]*1000
         # #print("left_theta_rad",self.left_theta_rad)
         # #print(left_data,left_wrist_t)
-        message = [
-            # 
-            *zyx_left_robot,
-            # -1.5708, 1.5708, 0,
-            *left_wrist_t,1.0,
-            # -500.0, 300, 100.0, 0.5233,
-            1.0,
-            # right
-            # 0.0, 1.5708, 0.0,
-            # 100.0, -200, 500.0, 0.0,
-            #  0.0
-            *zyx_right_robot,
-            *right_wrist_t,-1.0,
-                0.0,
-            ]
-        
-        print("left_o:  ",*zyx_left_robot)
-        print("left_p:  ",*left_wrist_t)
         # message = [
         #     #
         #     *zyx_left_robot,
-        #     *left_wrist_t,1.0,
+        #     # -1.5708, 1.5708, 0,
+        #     *left_wrist_t,self.left_theta_rad,
+        #     # -500.0, 300, 100.0, 0.5233,
+        #     1.0,
+        #     #right
+        #     # 0.0, 1.5708, 0.0,
+        #     # 100.0, -200, 500.0, 0.0,
+        #     #  0.0
         #     *zyx_right_robot,
-        #     *right_wrist_t,-1.0,
-        #     left_finger_1,left_finger_2,left_finger_3,left_finger_4,left_finger_5,left_finger_6,
-        #     right_finger_1,right_finger_2,right_finger_3,right_finger_4,right_finger_5,right_finger_6,
-        #     left_finger_3/90*85,right_finger_3/90*85
+        #     *right_wrist_t,self.right_theta_rad,
+        #         0.0,
         #     ]
+        message = [
+            #
+            *zyx_left_robot,
+            *left_wrist_t,1.3,
+            *zyx_right_robot,
+            *right_wrist_t,-1.3,
+            left_finger_1,left_finger_2,left_finger_3,left_finger_4,left_finger_5,left_finger_6,
+            right_finger_1,right_finger_2,right_finger_3,right_finger_4,right_finger_5,right_finger_6,
+            0.0,0.0
+            ]
         #依次次输入左臂外旋zyx欧拉角，xyz位置和臂形角bet夹爪状态，
         # 右臂外旋zyx欧拉角，xyz位置和臂形角bet夹爪状态
         # #print(message[0])
@@ -566,8 +616,12 @@ class TFPublisher:
 
 if __name__ == '__main__':
     
-        print("UDP start!")
-        rec = TFPublisher()
-        ##print("123456")
+        # print("UDP start!")
+        print('-------------------------------------registration begin!----------------------------')
+        
+        rec = TFPublisher()  
+        # rec.re_shoulder_tf()
+        print("-----------------------------registration done!-------------------------")
+
         rec.publish_tf()
         
