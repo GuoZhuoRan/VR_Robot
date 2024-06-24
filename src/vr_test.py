@@ -5,8 +5,10 @@
 from geometry_msgs.msg import TransformStamped
 from tf.transformations import quaternion_from_euler, euler_from_matrix
 import struct
-from HelpFuction import xyz_quaternion_to_homogeneous, rpy2rotation_matrix, rotation_matrix_to_rpy, \
+from HelpFuction import matrix3d_to_euler_angles_zyx, xyz_quaternion_to_homogeneous, rpy2rotation_matrix, rotation_matrix_to_rpy, \
     find_axis_angle, calc_dist
+
+import quest3_hand
 
 import receiver
 import datetime
@@ -23,7 +25,9 @@ from scipy.spatial.transform import Rotation
 from pynput import keyboard
 
 
-server_ip="127.0.0.1"
+# server_ip="127.0.0.1"
+server_ip="192.168.112.68"
+
 server_port=5015
 
 '''
@@ -48,6 +52,22 @@ right_lim = np.zeros((4,4))
 # right:up_lim_min=[-300:300,-600:-100,-150:500]
 
 running = False
+
+vr_device_type=''
+
+def calibrate():
+    global save_head_pose
+    if vr_device_type=='vision_pro':
+
+        save_head_pose=recv_head_pose[:,:]
+        print(f'save_head_pose is {save_head_pose}')
+    elif vr_device_type =='quest3':
+        quest3_hand.calibrate_shoudler()
+    else:
+        print("calibrate error: can not determine device!")
+    
+    print(f'calibrate is success')
+
 
 def on_press(key):
     global save_head_pose
@@ -155,27 +175,7 @@ class UdpIkSender:
 
 
 
-# 内旋转外旋（移动坐标系转固定坐标系）
-def matrix3d_to_euler_angles_zyx(m3dr):
 
-    beta_y = np.arctan2(m3dr[0, 2], np.sqrt(m3dr[0, 0] * m3dr[0, 0] + m3dr[0, 1] * m3dr[0, 1]))
-    alpha_z = np.arctan2(-m3dr[0, 1] / np.cos(beta_y), m3dr[0, 0] / np.cos(beta_y))
-    gamma_x = np.arctan2(-m3dr[1, 2] / np.cos(beta_y), m3dr[2, 2] / np.cos(beta_y))
-
-    if np.abs(beta_y - np.pi / 2) < 10e-4:
-        gamma_x = 0
-        alpha_z = np.arctan2(m3dr[1, 0], m3dr[1, 1])
-
-    if np.abs(beta_y + np.pi / 2) < 10e-4:
-        gamma_x = 0
-        alpha_z = np.arctan2(m3dr[1, 0], m3dr[1, 1])
-
-    gamma_x = (gamma_x + np.pi) % (2 * np.pi) - np.pi
-    beta_y = (beta_y + np.pi) % (2 * np.pi) - np.pi
-    alpha_z = (alpha_z + np.pi) % (2 * np.pi) - np.pi
-
-    return np.array([alpha_z, beta_y, gamma_x])
-######################################################
 
 def get_hand_tf(group_to_head,group_to_left_hand,group_to_right_hand):
 
@@ -249,7 +249,7 @@ def calc_arm_angle2(p_right_wrist, p_right_elbow, p_right_shoulder):
 
 class TFPublisher:
     def __init__(self):
-        global recv_head_pose
+        global recv_head_pose,vr_device_type
         # listening()
 
         # print("asdfagehbr")
@@ -316,6 +316,7 @@ class TFPublisher:
             l = len(data_bytes)
             #print("1234455",l)
             if l==16*4*53:
+                vr_device_type='vision_pro'
                 # Unpack the received data into a float array
                 # print(f'databytes is {l}')
                 float_array = struct.unpack('848f', data_bytes)
@@ -338,36 +339,19 @@ class TFPublisher:
                 valid_left=True
                 valid_right=True
                 self.process_vision_pro_data(valid_left ,valid_right,float_array)
+            elif l == 4 * 49 * 7:
+                vr_device_type='quest3'
+                xyzqwqxqyqz = quest3_hand.handle_raw_data(data_bytes)
+                self.process_quest3_data(xyzqwqxqyqz)
 
-                    
-                
-
-            
-            
-            
-            if l == 4*4:
+            elif l == 4*4:
                 float_array = struct.unpack(f'{4}f', data_bytes)
                 self.data={'n':int(float_array[0]),'body':[]}
                 self.data_len_f=int(float_array[1])
                 # if data['n']==0:
                 #     process_function(data)
 
-            ###Send Meta Message
-
-            # if l== 4*49*7:
-            #     ###49 7(x,y,z,rw,rx,ry,rz)
-            #     float_array = struct.unpack('343f', data_bytes)
-            #     float_array = np.array(float_array,dtype=float).reshape(49,7)
-            #     tf_msg = create_tf_xyz_rpy(head_data_t[0],head_data_t[1],head_data_t[2],head_data_rpy[0],head_data_rpy[1],head_data_rpy[2],'map','head')
-        
-
-            #     # Publish the TF message
-            #     self.tf_broadcaster.sendTransform(tf_msg)
-
-                
-
-
-            if l == 4 * (self.data_len_f):
+            elif l == 4 * (self.data_len_f):
                 # self.data_len_f = 1 + 32 * 8
 
                 # Unpack the received data into a float array
@@ -515,10 +499,6 @@ class TFPublisher:
 
 
         return in_x_l and in_y_l and in_z_l , in_x_r and in_y_r and in_z_r
-        
-
-      
-
 
     def process_vision_pro_data(self,valid_left ,valid_right,float_array):
         global left_hand,right_hand
@@ -740,6 +720,59 @@ class TFPublisher:
 
 
         #print("---visionpro process is done------------------")
+
+    def process_quest3_data(self,xyzqwqxqyqz):
+        
+        global left_hand,right_hand
+
+        [
+            zyx_left_robot,
+            left_wrist_t,
+            zyx_right_robot,
+            right_wrist_t,
+            left_finger_1,left_finger_2,left_finger_3,left_finger_4,left_finger_5,left_finger_6,
+            right_finger_1,right_finger_2,right_finger_3,right_finger_4,right_finger_5,right_finger_6
+            ]=quest3_hand.process(xyzqwqxqyqz)
+        
+        message = [
+            # 
+            *zyx_left_robot,
+            # -1.5708, 1.5708, 0,
+            *left_wrist_t,1.0,
+            # -500.0, 300, 100.0, 0.5233,
+           1.0,
+            # right
+            # 0.0, 1.5708, 0.0,
+            # 100.0, -200, 500.0, 0.0,
+            #  0.0True
+            *zyx_right_robot,
+            *right_wrist_t,-1.0,
+                0.0,
+            ]
+        
+        ##print("left_o:  ",*zyx_left_robot)
+        ###print("left_p:  ",*left_wrist_t)
+        # message = [
+        #     #
+        #     *zyx_left_robot,
+        #     *left_wrist_t,1.0,
+        #     *zyx_right_robot,
+        #     *right_wrist_t,-1.0,
+        #     left_finger_1,left_finger_2,left_finger_3,left_finger_4,left_finger_5,left_finger_6,
+        #     right_finger_1,right_finger_2,right_finger_3,right_finger_4,right_finger_5,right_finger_6,
+        #     left_finger_3/90*85,right_finger_3/90*85
+        #     ]
+        #依次次输入左臂外旋zyx欧拉角，xyz位置和臂形角bet夹爪状态，
+        # 右臂外旋zyx欧拉角，xyz位置和臂形角bet夹爪状态
+        # ##print(message[0])
+        # print(message)
+        self.udp_ik_sender.send(message)
+
+        left_hand=[*zyx_left_robot,*left_wrist_t,left_finger_1,left_finger_2,left_finger_3,left_finger_4,left_finger_5,left_finger_6]
+        right_hand=[*zyx_right_robot,*right_wrist_t,right_finger_1,right_finger_2,right_finger_3,right_finger_4,right_finger_5,right_finger_6]
+
+
+
 
 
 def main():

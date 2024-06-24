@@ -239,3 +239,25 @@ def xyz_quaternion_to_homogeneous(x, y, z,qw, qx, qy, qz):
 
 def calc_dist(a,b):
     return np.linalg.norm(a-b)
+
+# 内旋转外旋（移动坐标系转固定坐标系）
+def matrix3d_to_euler_angles_zyx(m3dr):
+
+    beta_y = np.arctan2(m3dr[0, 2], np.sqrt(m3dr[0, 0] * m3dr[0, 0] + m3dr[0, 1] * m3dr[0, 1]))
+    alpha_z = np.arctan2(-m3dr[0, 1] / np.cos(beta_y), m3dr[0, 0] / np.cos(beta_y))
+    gamma_x = np.arctan2(-m3dr[1, 2] / np.cos(beta_y), m3dr[2, 2] / np.cos(beta_y))
+
+    if np.abs(beta_y - np.pi / 2) < 10e-4:
+        gamma_x = 0
+        alpha_z = np.arctan2(m3dr[1, 0], m3dr[1, 1])
+
+    if np.abs(beta_y + np.pi / 2) < 10e-4:
+        gamma_x = 0
+        alpha_z = np.arctan2(m3dr[1, 0], m3dr[1, 1])
+
+    gamma_x = (gamma_x + np.pi) % (2 * np.pi) - np.pi
+    beta_y = (beta_y + np.pi) % (2 * np.pi) - np.pi
+    alpha_z = (alpha_z + np.pi) % (2 * np.pi) - np.pi
+
+    return np.array([alpha_z, beta_y, gamma_x])
+######################################################

@@ -16,16 +16,9 @@ running=True
 def prin():
     print('start listening ')
 
-
-
-
-
-
-
 def calibrate():
 
-    vr_test.save_head_pose=vr_test.recv_head_pose[:,:]
-    print(f'save_head_pose is {vr_test.save_head_pose}')
+    vr_test.calibrate()
     pass
 
 
