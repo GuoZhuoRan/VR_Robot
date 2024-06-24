@@ -22,6 +22,24 @@ from mpl_toolkits.mplot3d import Axes3D
 from scipy.spatial.transform import Rotation
 from pynput import keyboard
 
+
+server_ip="127.0.0.1"
+server_port=5015
+
+'''
+type 1 mujoco
+type 2 robot
+'''
+robot_type="mujoco"
+
+robot_ip="192.168.112.68"
+robot_port=5005
+
+left_hand=np.zeros((12))
+right_hand=np.zeros((12))
+
+
+
 recv_head_pose = np.eye(4)
 save_head_pose = np.eye(4)
 left_lim = np.zeros((4,4))
@@ -57,8 +75,8 @@ def listening():
         # listener.start()
     #     ...
     # listener=keyboard.Listener(on_press=on_press, on_release=on_release)
-listener_thread = threading.Thread(target=listening)
-listener_thread.start()
+# listener_thread = threading.Thread(target=listening)
+# listener_thread.start()
 
 
 
@@ -115,10 +133,13 @@ def calc_arm_angle(T_base_to_w, T_base_to_e, T_base_to_s):
     # #print(np.rad2deg(theta_rad))
     return theta_rad
 
+
+
+
 class UdpIkSender:
     def __init__(self):
-        self.client_host = "192.168.112.143"
-        self.client_port = 5005
+        self.client_host = robot_ip
+        self.client_port = robot_port
         BUFFER_SIZE = 1024
 
         # 创建UDP套接字
@@ -247,13 +268,13 @@ class TFPublisher:
         self.last_left_pose=([0,0,0],[0,0,0])
 
 
-        UDP_IP = "127.0.0.1"  # IP address to listen on
-        UDP_PORT = 5015  # Port to listen on
+        # UDP_IP = "127.0.0.1"  # IP address to listen on
+        # UDP_PORT = 5015  # Port to listen on
         self.BUFFER_SIZE = 8888  # Buffer size for incoming messages
 
         # Create UDP socket
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.bind((UDP_IP, UDP_PORT))
+        sock.bind((server_ip, server_port))
 
         #print("UDP receiver started")
 
@@ -296,7 +317,7 @@ class TFPublisher:
             #print("1234455",l)
             if l==16*4*53:
                 # Unpack the received data into a float array
-                # print(f'databytes is {data_bytes}')
+                # print(f'databytes is {l}')
                 float_array = struct.unpack('848f', data_bytes)
 
                 self.bounding_box = {
@@ -500,6 +521,7 @@ class TFPublisher:
 
 
     def process_vision_pro_data(self,valid_left ,valid_right,float_array):
+        global left_hand,right_hand
         #print('--------------begin  visionpro processing!-------------')
         head_data=np.array(float_array[:16])
 
@@ -672,7 +694,7 @@ class TFPublisher:
             # right
             # 0.0, 1.5708, 0.0,
             # 100.0, -200, 500.0, 0.0,
-            #  0.0
+            #  0.0True
             *zyx_right_robot,
             *right_wrist_t,-1.0,
                 0.0,
@@ -680,20 +702,25 @@ class TFPublisher:
         
         ##print("left_o:  ",*zyx_left_robot)
         ###print("left_p:  ",*left_wrist_t)
-        message = [
-            #
-            *zyx_left_robot,
-            *left_wrist_t,1.0,
-            *zyx_right_robot,
-            *right_wrist_t,-1.0,
-            left_finger_1,left_finger_2,left_finger_3,left_finger_4,left_finger_5,left_finger_6,
-            right_finger_1,right_finger_2,right_finger_3,right_finger_4,right_finger_5,right_finger_6,
-            left_finger_3/90*85,right_finger_3/90*85
-            ]
+        # message = [
+        #     #
+        #     *zyx_left_robot,
+        #     *left_wrist_t,1.0,
+        #     *zyx_right_robot,
+        #     *right_wrist_t,-1.0,
+        #     left_finger_1,left_finger_2,left_finger_3,left_finger_4,left_finger_5,left_finger_6,
+        #     right_finger_1,right_finger_2,right_finger_3,right_finger_4,right_finger_5,right_finger_6,
+        #     left_finger_3/90*85,right_finger_3/90*85
+        #     ]
         #依次次输入左臂外旋zyx欧拉角，xyz位置和臂形角bet夹爪状态，
         # 右臂外旋zyx欧拉角，xyz位置和臂形角bet夹爪状态
         # ##print(message[0])
+        # print(message)
         self.udp_ik_sender.send(message)
+
+        left_hand=[*zyx_left_robot,*left_wrist_t,left_finger_1,left_finger_2,left_finger_3,left_finger_4,left_finger_5,left_finger_6]
+        right_hand=[*zyx_right_robot,*right_wrist_t,right_finger_1,right_finger_2,right_finger_3,right_finger_4,right_finger_5,right_finger_6]
+
 
     
         # tf_msg = create_tf_xyz_quat(float_array[1]/1000,float_array[2]/1000,float_array[3]/1000,float_array[4],float_array[5],float_array[6],float_array[7],'map',link)
@@ -714,6 +741,9 @@ class TFPublisher:
 
         #print("---visionpro process is done------------------")
 
+
+def main():
+    rec = TFPublisher()
 
 if __name__ == '__main__':
     
