@@ -25,8 +25,8 @@ from scipy.spatial.transform import Rotation
 from pynput import keyboard
 
 
-# server_ip="127.0.0.1"
-server_ip="192.168.112.68"
+server_ip="127.0.0.1"
+# server_ip="192.168.113.244"
 
 server_port=5015
 
@@ -36,8 +36,9 @@ type 2 robot
 '''
 robot_type="mujoco"
 
-robot_ip="192.168.112.68"
-robot_port=5005
+
+robot_ip="192.168.112.62"
+robot_port=8010
 
 left_hand=np.zeros((12))
 right_hand=np.zeros((12))
@@ -169,8 +170,19 @@ class UdpIkSender:
         # client_socket.bind((client_host, client_port))
 
     def send(self, message):
-        packed_data = b''.join([struct.pack('>f', num) for num in message])#simulation >
-        self.client_socket.sendto(packed_data, (self.client_host, self.client_port))
+        #guozi: modification
+        # packed_data = b''
+
+        if robot_type =='mujoco':
+            print("send mujoco")
+            packed_data = b''.join([struct.pack('>f', num) for num in message])#simulation >
+            self.client_socket.sendto(packed_data, (self.client_host, self.client_port))
+        elif robot_type == 'robot':
+            print("send robot")
+            packed_data = b''.join([struct.pack('<f', num) for num in message])
+            self.client_socket.sendto(packed_data, (self.client_host, self.client_port))
+
+        # self.client_socket.sendto(packed_data, (self.client_host, self.client_port))
         # #print('send')
 
 
@@ -664,42 +676,12 @@ class TFPublisher:
         
         # ##print("left_theta_rad",self.left_theta_rad)
         # ##print(left_data,left_wrist_t)
-        message = [
-            # 
-            *zyx_left_robot,
-            # -1.5708, 1.5708, 0,
-            *left_wrist_t,1.0,
-            # -500.0, 300, 100.0, 0.5233,
-           1.0,
-            # right
-            # 0.0, 1.5708, 0.0,
-            # 100.0, -200, 500.0, 0.0,
-            #  0.0True
-            *zyx_right_robot,
-            *right_wrist_t,-1.0,
-                0.0,
-            ]
-        
-        ##print("left_o:  ",*zyx_left_robot)
-        ###print("left_p:  ",*left_wrist_t)
-        # message = [
-        #     #
-        #     *zyx_left_robot,
-        #     *left_wrist_t,1.0,
-        #     *zyx_right_robot,
-        #     *right_wrist_t,-1.0,
-        #     left_finger_1,left_finger_2,left_finger_3,left_finger_4,left_finger_5,left_finger_6,
-        #     right_finger_1,right_finger_2,right_finger_3,right_finger_4,right_finger_5,right_finger_6,
-        #     left_finger_3/90*85,right_finger_3/90*85
-        #     ]
-        #依次次输入左臂外旋zyx欧拉角，xyz位置和臂形角bet夹爪状态，
-        # 右臂外旋zyx欧拉角，xyz位置和臂形角bet夹爪状态
-        # ##print(message[0])
-        # print(message)
-        self.udp_ik_sender.send(message)
-
-        left_hand=[*zyx_left_robot,*left_wrist_t,left_finger_1,left_finger_2,left_finger_3,left_finger_4,left_finger_5,left_finger_6]
-        right_hand=[*zyx_right_robot,*right_wrist_t,right_finger_1,right_finger_2,right_finger_3,right_finger_4,right_finger_5,right_finger_6]
+        self.send_message(zyx_left_robot,
+            left_wrist_t,
+            zyx_right_robot,
+            right_wrist_t,
+            left_finger_1,left_finger_2,left_finger_3,left_finger_4,left_finger_5,left_finger_6,
+            right_finger_1,right_finger_2,right_finger_3,right_finger_4,right_finger_5,right_finger_6)
 
 
     
@@ -721,20 +703,18 @@ class TFPublisher:
 
         #print("---visionpro process is done------------------")
 
-    def process_quest3_data(self,xyzqwqxqyqz):
-        
-        global left_hand,right_hand
-
-        [
-            zyx_left_robot,
+    def send_message(self,zyx_left_robot,
             left_wrist_t,
             zyx_right_robot,
             right_wrist_t,
             left_finger_1,left_finger_2,left_finger_3,left_finger_4,left_finger_5,left_finger_6,
-            right_finger_1,right_finger_2,right_finger_3,right_finger_4,right_finger_5,right_finger_6
-            ]=quest3_hand.process(xyzqwqxqyqz)
+            right_finger_1,right_finger_2,right_finger_3,right_finger_4,right_finger_5,right_finger_6):
         
-        message = [
+
+        global left_hand,right_hand
+
+        if robot_type=='mujoco':
+             message = [
             # 
             *zyx_left_robot,
             # -1.5708, 1.5708, 0,
@@ -749,27 +729,45 @@ class TFPublisher:
             *right_wrist_t,-1.0,
                 0.0,
             ]
-        
-        ##print("left_o:  ",*zyx_left_robot)
-        ###print("left_p:  ",*left_wrist_t)
-        # message = [
-        #     #
-        #     *zyx_left_robot,
-        #     *left_wrist_t,1.0,
-        #     *zyx_right_robot,
-        #     *right_wrist_t,-1.0,
-        #     left_finger_1,left_finger_2,left_finger_3,left_finger_4,left_finger_5,left_finger_6,
-        #     right_finger_1,right_finger_2,right_finger_3,right_finger_4,right_finger_5,right_finger_6,
-        #     left_finger_3/90*85,right_finger_3/90*85
-        #     ]
-        #依次次输入左臂外旋zyx欧拉角，xyz位置和臂形角bet夹爪状态，
-        # 右臂外旋zyx欧拉角，xyz位置和臂形角bet夹爪状态
-        # ##print(message[0])
-        # print(message)
+        elif robot_type=='robot':
+            message = [
+            #
+            *zyx_left_robot,
+            *left_wrist_t,1.0,
+            *zyx_right_robot,
+            *right_wrist_t,-1.0,
+            left_finger_1,left_finger_2,left_finger_3,left_finger_4,left_finger_5,left_finger_6,
+            right_finger_1,right_finger_2,right_finger_3,right_finger_4,right_finger_5,right_finger_6,
+            left_finger_3/90*85,right_finger_3/90*85
+            ]
+
+
         self.udp_ik_sender.send(message)
 
         left_hand=[*zyx_left_robot,*left_wrist_t,left_finger_1,left_finger_2,left_finger_3,left_finger_4,left_finger_5,left_finger_6]
         right_hand=[*zyx_right_robot,*right_wrist_t,right_finger_1,right_finger_2,right_finger_3,right_finger_4,right_finger_5,right_finger_6]
+        
+
+
+    def process_quest3_data(self,xyzqwqxqyqz):
+        
+        
+        [
+            zyx_left_robot,
+            left_wrist_t,
+            zyx_right_robot,
+            right_wrist_t,
+            left_finger_1,left_finger_2,left_finger_3,left_finger_4,left_finger_5,left_finger_6,
+            right_finger_1,right_finger_2,right_finger_3,right_finger_4,right_finger_5,right_finger_6
+            ]=quest3_hand.process(xyzqwqxqyqz)
+        
+        self.send_message(zyx_left_robot,
+            left_wrist_t,
+            zyx_right_robot,
+            right_wrist_t,
+            left_finger_1,left_finger_2,left_finger_3,left_finger_4,left_finger_5,left_finger_6,
+            right_finger_1,right_finger_2,right_finger_3,right_finger_4,right_finger_5,right_finger_6)
+  
 
 
 

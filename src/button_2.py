@@ -1,7 +1,7 @@
 import os
 import sys
 from time import sleep
-from PyQt5.QtWidgets import QMessageBox,QApplication, QWidget, QLabel, QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout, QGridLayout
+from PyQt5.QtWidgets import QMessageBox,QApplication, QWidget, QLabel,QListWidget, QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout, QGridLayout
 import subprocess
 from PyQt5.QtCore import QThread, pyqtSignal
 import threading
@@ -69,6 +69,15 @@ class RobotControllerUI(QWidget):
         listener_thread.start()
         pass
 
+    def on_selection_change(self):
+        selected_items = self.listWidget.selectedItems()
+        if selected_items:
+            selected_text = selected_items[0].text()
+            self.label_type.setText(f'Selected: {selected_text}')
+            vr_test.robot_type = selected_text
+        else:
+            self.label_type.setText('No selection')
+
 
     def initUI(self):
 
@@ -85,6 +94,7 @@ class RobotControllerUI(QWidget):
         self.start_processing_btn = QPushButton('Start processing')
         # self.end_processing_btn = QPushButton('End processing')
         self.calibration_headpose_btn = QPushButton('Calibration headpose')
+        #add shoulder pose button
 
         #Guozi: Add click functions
         self.start_pv_btn.clicked.connect(self.start_vp_server)
@@ -114,8 +124,19 @@ class RobotControllerUI(QWidget):
         grid.addWidget(QLabel(f'Destination IP: {vr_test.robot_ip}:{vr_test.robot_port}'), 7, 0)
         # self.destination_ip_edit = QLineEdit()
         # grid.addWidget(self.destination_ip_edit, 7, 1)
+        self.label_type =QLabel(f'Type:{vr_test.robot_type}')
+        grid.addWidget(self.label_type, 8, 0)
+
+        # Create a QListWidget with single selection mode
+        self.listWidget = QListWidget()
+        self.listWidget.addItems(['mujoco', 'robot'])
+        self.listWidget.setSelectionMode(QListWidget.SingleSelection)
+
+        grid.addWidget(self.listWidget)
+
+        # Connect the selection change signal to the slot
+        self.listWidget.itemSelectionChanged.connect(self.on_selection_change)
         
-        grid.addWidget(QLabel(f'Type:{vr_test.robot_type}'), 8, 0)
         # self.type_edit = QLineEdit('robot')
         # grid.addWidget(self.type_edit, 8, 1)
         
