@@ -25,6 +25,21 @@ from scipy.spatial.transform import Rotation
 from pynput import keyboard
 
 
+'''
+Guozi:modify should pose
+'''
+
+head_to_left_S = np.array([[1, 0, 0, -0.2],
+                            [0, 1, 0, -0.15],
+                            [0, 0, 1, -0.25],
+                            [0, 0, 0, 1]])
+
+head_to_right_S = np.array([[1, 0, 0, 0.13],
+                            [0, 1, 0, -0.15],
+                            [0, 0, 1, -0.25],
+                            [0, 0, 0, 1]])
+
+
 server_ip="127.0.0.1"
 # server_ip="192.168.113.244"
 
@@ -37,12 +52,11 @@ type 2 robot
 robot_type="mujoco"
 
 
-robot_ip="192.168.112.62"
-robot_port=8010
+robot_ip="127.0.0.1"
+robot_port=5005
 
 left_hand=np.zeros((12))
 right_hand=np.zeros((12))
-
 
 
 recv_head_pose = np.eye(4)
@@ -191,15 +205,17 @@ class UdpIkSender:
 
 def get_hand_tf(group_to_head,group_to_left_hand,group_to_right_hand):
 
-    head_to_left_S = np.array([[1, 0, 0, -0.2],
-                            [0, 1, 0, -0.15],
-                            [0, 0, 1, -0.25],
-                            [0, 0, 0, 1]])
+    # head_to_left_S = np.array([[1, 0, 0, -0.2],
+                            # [0, 1, 0, -0.15],
+                            # [0, 0, 1, -0.25],
+                            # [0, 0, 0, 1]])
 
-    head_to_right_S = np.array([[1, 0, 0, 0.13],
-                            [0, 1, 0, -0.15],
-                            [0, 0, 1, -0.25],
-                            [0, 0, 0, 1]])
+    # head_to_right_S = np.array([[1, 0, 0, 0.13],
+                            # [0, 1, 0, -0.15],
+                            # [0, 0, 1, -0.25],
+                            # [0, 0, 0, 1]])
+
+    
 
     should_to_sun_left_should = np.array([[0.0000000,  0.0000000, -1.0000000, 0],
                             [0.0000000,  1.0000000,  0.0000000, 0],
@@ -230,6 +246,8 @@ def get_hand_tf(group_to_head,group_to_left_hand,group_to_right_hand):
 
 
     should_to_hand_right = np.linalg.inv(should_to_sun_right_should)@np.linalg.inv(head_to_right_S)@np.linalg.inv(group_to_head)@group_to_right_hand@hand_to_sun_right_hand
+
+    print(head_to_left_S)
 
     zyx_left=matrix3d_to_euler_angles_zyx(should_to_hand_left)
     zyx_right=matrix3d_to_euler_angles_zyx(should_to_hand_right)
