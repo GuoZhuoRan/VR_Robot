@@ -1,2 +1,2 @@
 # VR_Robot
-connect vr and simulation &amp; robot platforms
+connect VR/Meta quest 3 to simulation & robot platforms
