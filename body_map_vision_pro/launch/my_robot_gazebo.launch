@@ -1,0 +1,12 @@
+<launch>
+  <arg name="urdf_file" default="$(find my_python_package)/config/my_robot.urdf" />
+
+  <include file="$(find gazebo_ros)/launch/empty_world.launch">
+    <arg name="world_name" value="$(find my_python_package)/config/my_world.world" />
+  </include>
+
+  <param name="robot_description" command="$(find xacro)/xacro '$(arg urdf_file)'" />
+
+  <node name="spawn_urdf" pkg="gazebo_ros" type="spawn_model" args="-urdf -model my_robot -param robot_description -x 0 -y 0 -z 0" />
+
+</launch>

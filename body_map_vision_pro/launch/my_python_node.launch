@@ -1,0 +1,6 @@
+<launch>
+    <!-- Launch the my_python_node.py node -->
+    <node pkg="my_python_package" type="handeye.py" name="handeye" output="screen">
+        <!-- Add any node-specific parameters here if needed -->
+    </node>
+</launch>
