@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Robot Controller</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        .container {
+            max-width: 600px;
+            margin-top: 20px;
+        }
+        .list-group-item {
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container border p-3">
+        <h2 class="text-center">Robot Controller</h2>
+        <div class="form-group">
+            <button id="start-pv" class="btn btn-secondary btn-block mb-2">Start PV</button>
+            <button id="start-processing" class="btn btn-secondary btn-block mb-2">Start Processing</button>
+            <button id="calibration-headpose" class="btn btn-secondary btn-block mb-2">Calibration Headpose</button>
+        </div>
+        <div class="form-group">
+            <label for="calibrated-head-pose">Calibrated head pose: r, p, y, x, y, z</label>
+            <input type="text" id="calibrated-head-pose" class="form-control mb-2" readonly>
+        </div>
+        <div class="form-group">
+            <label for="visionpro-ip">VisionPro IP</label>
+            <input type="text" id="visionpro-ip" class="form-control mb-2" value="192.168.113.27" readonly>
+        </div>
+        <div class="form-group">
+            <label for="local-ip">Local IP</label>
+            <input type="text" id="local-ip" class="form-control mb-2" value="127.0.0.1:5015" readonly>
+        </div>
+        <div class="form-group">
+            <label for="destination-ip">Destination IP</label>
+            <input type="text" id="destination-ip" class="form-control mb-2" value="192.168.112.62:8010" readonly>
+        </div>
+        <div class="form-group">
+            <label for="selected-option">Selected</label>
+            <ul id="selected-option" class="list-group">
+                <li class="list-group-item">mujoco</li>
+                <li class="list-group-item active">robot</li>
+            </ul>
+        </div>
+        <div class="form-group">
+            <label for="lh">L h:</label>
+            <input type="text" id="lh" class="form-control mb-2" value="[0.00, 0.00, 0.00, 0.00, 0.00, 0.00]" readonly>
+        </div>
+        <div class="form-group">
+            <label for="rh">R h:</label>
+            <input type="text" id="rh" class="form-control mb-2" value="[0.00, 0.00, 0.00, 0.00, 0.00, 0.00]" readonly>
+        </div>
+        <div class="form-group">
+            <label for="lf">L f:</label>
+            <input type="text" id="lf" class="form-control mb-2" value="[0.00, 0.00, 0.00, 0.00, 0.00, 0.00]" readonly>
+        </div>
+        <div class="form-group">
+            <label for="rf">R f:</label>
+            <input type="text" id="rf" class="form-control mb-2" value="[0.00, 0.00, 0.00, 0.00, 0.00, 0.00]" readonly>
+        </div>
+    </div>
+
+    <script>
+        function name(params) {
+            
+        }
+        $(document).ready(function(){
+
+            $('#selected-option .list-group-item').click(function(){
+                $('#selected-option .list-group-item').removeClass('active');
+                $(this).addClass('active');
+            });
+        });
+    </script>
+</body>
+</html>

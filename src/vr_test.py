@@ -2,8 +2,8 @@
 
 # import rospy
 # import tf2_ros
-from geometry_msgs.msg import TransformStamped
-from tf.transformations import quaternion_from_euler, euler_from_matrix
+# from geometry_msgs.msg import TransformStamped
+from transformations import quaternion_from_euler, euler_from_matrix
 import struct
 from HelpFuction import matrix3d_to_euler_angles_zyx, xyz_quaternion_to_homogeneous, rpy2rotation_matrix, rotation_matrix_to_rpy, \
     find_axis_angle, calc_dist
@@ -41,19 +41,22 @@ head_to_right_S = np.array([[1, 0, 0, 0.13],
 
 
 server_ip="127.0.0.1"
-# server_ip="192.168.113.244"
+# server_ip="192.168.37.21"
 
 server_port=5015
 
 '''
 type 1 mujoco
 type 2 robot
+type 3 zhuQue
 '''
-robot_type="mujoco"
+robot_type="zhuQue"
 
 
-robot_ip="127.0.0.1"
-robot_port=5005
+# robot_ip="192.168.113.244"
+# robot_port=5005
+robot_ip="192.168.112.62"
+robot_port=8010
 
 left_hand=np.zeros((12))
 right_hand=np.zeros((12))
@@ -69,6 +72,8 @@ right_lim = np.zeros((4,4))
 running = False
 
 vr_device_type=''
+
+BOUNDING_BOX=[0,0,0,0] #guozi:[x,y,w,l]
 
 def calibrate():
     global save_head_pose
@@ -187,13 +192,17 @@ class UdpIkSender:
         #guozi: modification
         # packed_data = b''
 
-        if robot_type =='mujoco':
-            print("send mujoco")
+        if robot_type =='mujoco' :
+            # print("send mujoco")
             packed_data = b''.join([struct.pack('>f', num) for num in message])#simulation >
             self.client_socket.sendto(packed_data, (self.client_host, self.client_port))
-        elif robot_type == 'robot':
-            print("send robot")
+        elif robot_type == 'robot' :
+            # print("send robot")
             packed_data = b''.join([struct.pack('<f', num) for num in message])
+            self.client_socket.sendto(packed_data, (self.client_host, self.client_port))
+        elif  robot_type=='zhuQue':
+            # print("send zhuQue")
+            packed_data = struct.pack('<6f1i6f1i2f',*message[:6],int(message[6]),*message[7:13],int(message[13]),*message[14:])
             self.client_socket.sendto(packed_data, (self.client_host, self.client_port))
 
         # self.client_socket.sendto(packed_data, (self.client_host, self.client_port))
@@ -247,7 +256,7 @@ def get_hand_tf(group_to_head,group_to_left_hand,group_to_right_hand):
 
     should_to_hand_right = np.linalg.inv(should_to_sun_right_should)@np.linalg.inv(head_to_right_S)@np.linalg.inv(group_to_head)@group_to_right_hand@hand_to_sun_right_hand
 
-    print(head_to_left_S)
+    # print(head_to_left_S)
 
     zyx_left=matrix3d_to_euler_angles_zyx(should_to_hand_left)
     zyx_right=matrix3d_to_euler_angles_zyx(should_to_hand_right)
@@ -279,20 +288,7 @@ def calc_arm_angle2(p_right_wrist, p_right_elbow, p_right_shoulder):
 
 class TFPublisher:
     def __init__(self):
-        global recv_head_pose,vr_device_type
-        # listening()
-
-        # print("asdfagehbr")
-        # Create a TF broadcaster
-
-        # Create a TransformStamped message
-        
-        # read tf
-
-
-        # self.tf_msg = create_tf_xyz_rpy(1,2,3,0,0,0,'map','camera_link')
-
-        # Publish the TF message at a rate of 10 Hz
+        global recv_head_pose,vr_device_type        
 
         self.last_right_pose=([0,0,0],[0,0,0])
         self.last_left_pose=([0,0,0],[0,0,0])
@@ -305,6 +301,9 @@ class TFPublisher:
         # Create UDP socket
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.bind((server_ip, server_port))
+
+        self.tm=cv2.TickMeter()
+        self.tm.start()
 
         #print("UDP receiver started")
 
@@ -358,17 +357,20 @@ class TFPublisher:
 
 
                 recv_head_pose=np.array(float_array[:16]).reshape(4,4)[:,:]
-
-
             
                 # print('----------------registration-----------')
                 # self.register(float_array)                
-                valid_left ,valid_right = self.is_point_in_rotated_bounding_box(np.array(float_array[16:32]).reshape(4,4),
+                # valid_left ,valid_right = self.is_point_in_rotated_bounding_box(np.array(float_array[16:32]).reshape(4,4),
+                #                                             np.array(float_array[32:48]).reshape(4,4))
+                #Guozi: Add protective boundaries for robots
+                valid_left,valid_right = self.set_global_boundaries(np.array(float_array[16:32]).reshape(4,4),
                                                             np.array(float_array[32:48]).reshape(4,4))
                 
                 valid_left=True
                 valid_right=True
+                
                 self.process_vision_pro_data(valid_left ,valid_right,float_array)
+
             elif l == 4 * 49 * 7:
                 vr_device_type='quest3'
                 xyzqwqxqyqz = quest3_hand.handle_raw_data(data_bytes)
@@ -525,10 +527,27 @@ class TFPublisher:
         
         in_x_r = self.x_min <= point_local_right[0] <= self.x_max
         in_y_r = self.y_min <= point_local_right[1] #<= self.y_max
-        in_z_r = self.z_min-1.65+save_head_pose[2,3] <= point_local_right[2] <= self.z_max-1.65+save_head_pose[2,3]
+        in_z_r = self.z_min-1.65+save_head_pose[2,3] <= point_local_right[2] <= self.z_max-1.65+save_head_pose[2,3]       
 
 
         return in_x_l and in_y_l and in_z_l , in_x_r and in_y_r and in_z_r
+    
+    def set_global_boundaries(self,left_hand,right_hand):
+
+        global BOUNDING_BOX #[x,y,w,l]
+
+        BOUNDING_BOX[0] = save_head_pose[0,-1]-0.2-self.x_max
+        BOUNDING_BOX[1] = save_head_pose[1,-1]+self.y_max
+        BOUNDING_BOX[2] = self.y_max*2
+        BOUNDING_BOX[3]= self.x_max*2+0.2*2
+        
+        l_x=BOUNDING_BOX[0]<=left_hand[0,-1]<=BOUNDING_BOX[0]+BOUNDING_BOX[3]
+        r_x=BOUNDING_BOX[0]<=right_hand[0,-1]<=BOUNDING_BOX[0]+BOUNDING_BOX[3]
+        l_y=BOUNDING_BOX[1]-BOUNDING_BOX[2]<=left_hand[1,-1]<=BOUNDING_BOX[1]
+        r_y=BOUNDING_BOX[1]-BOUNDING_BOX[2]<=right_hand[1,-1]<=BOUNDING_BOX[1]
+
+        return l_x and l_y, r_x and r_y
+
 
     def process_vision_pro_data(self,valid_left ,valid_right,float_array):
         global left_hand,right_hand
@@ -699,7 +718,7 @@ class TFPublisher:
             zyx_right_robot,
             right_wrist_t,
             left_finger_1,left_finger_2,left_finger_3,left_finger_4,left_finger_5,left_finger_6,
-            right_finger_1,right_finger_2,right_finger_3,right_finger_4,right_finger_5,right_finger_6)
+            right_finger_1,right_finger_2,right_finger_3,right_finger_4,right_finger_5,right_finger_6)    
 
 
     
@@ -758,6 +777,18 @@ class TFPublisher:
             right_finger_1,right_finger_2,right_finger_3,right_finger_4,right_finger_5,right_finger_6,
             left_finger_3/90*85,right_finger_3/90*85
             ]
+        elif robot_type =='zhuQue':
+            message = [
+                *left_wrist_t,
+                *zyx_left_robot,
+                1.0,
+                *right_wrist_t,
+                *zyx_right_robot,
+                1.0,
+                left_finger_3/90*85,
+                right_finger_3/90*85
+            ]
+
 
 
         self.udp_ik_sender.send(message)
@@ -765,7 +796,9 @@ class TFPublisher:
         left_hand=[*zyx_left_robot,*left_wrist_t,left_finger_1,left_finger_2,left_finger_3,left_finger_4,left_finger_5,left_finger_6]
         right_hand=[*zyx_right_robot,*right_wrist_t,right_finger_1,right_finger_2,right_finger_3,right_finger_4,right_finger_5,right_finger_6]
         
-
+        # self.tm.stop()
+        # print(self.tm.getFPS())
+        # self.tm.start()
 
     def process_quest3_data(self,xyzqwqxqyqz):
         
@@ -785,6 +818,11 @@ class TFPublisher:
             right_wrist_t,
             left_finger_1,left_finger_2,left_finger_3,left_finger_4,left_finger_5,left_finger_6,
             right_finger_1,right_finger_2,right_finger_3,right_finger_4,right_finger_5,right_finger_6)
+        
+
+ 
+        
+        
   
 
 

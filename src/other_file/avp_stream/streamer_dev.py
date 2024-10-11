@@ -20,8 +20,7 @@ YUP2ZUP = np.array([[[1, 0, 0, 0],
 
 running=True
 
-vision_pro_ip='192.168.113.27'
-# vision_pro_port=
+vision_pro_ip='192.168.113.18'
 
 udp_ip = "127.0.0.1"  # Target IP address
 udp_port = 5015  # Target port number
@@ -181,7 +180,7 @@ if __name__ == "__main__":
 
 
 
-    streamer = VisionProStreamer(ip = '192.168.112.109',root='output',json_name=js_name)##guozi:10.29.230.57
+    streamer = VisionProStreamer(ip = '192.168.113.18',root='output',json_name=js_name)##guozi:10.29.230.57
     while True: 
         js_name = f"file_{time_step}.json"
         time.sleep(1)

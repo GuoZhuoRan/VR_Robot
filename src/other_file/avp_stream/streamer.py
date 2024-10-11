@@ -110,7 +110,7 @@ if __name__ == "__main__":
         js_name = f"file_{time_step}.json"
 
 
-        streamer = VisionProStreamer(ip = '192.168.113.40',root='visionpro_data/output',json_name=js_name)##guozi:10.29.230.57
+        streamer = VisionProStreamer(ip = '192.168.4.27',root='visionpro_data/output',json_name=js_name)##guozi:10.29.230.57
 
 
         latest = streamer.get_latest()

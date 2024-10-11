@@ -132,7 +132,7 @@ def calc_arm_angle(T_base_to_w, T_base_to_e, T_base_to_s):
 
 class UdpIkSender:
     def __init__(self):
-        self.client_host = "192.168.112.143"
+        self.client_host = "192.168.113.244"
         self.client_port = 5005
         BUFFER_SIZE = 1024
 

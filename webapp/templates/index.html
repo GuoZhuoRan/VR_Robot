@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Execute Python Function</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+    <script src="{{ url_for('static', filename='js/jquery-3.6.0.min.js') }}"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-6 col-sm-8 col-12 text-center">
+                <button id="execute-button">Execute Function</button>
+                <div id="result">wait click</div>
+                <button id="execute-button2">Execute Function2</button>
+                <div id="result2">wait click</div>
+                <h1>Current Number: <span id="number"></span></h1>
+                <button id="execute-button3">Execute</button>
+                <div id="result3">end</div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        $(document).ready(function(){
+
+            // 请求服务器获取按钮的启用状态
+            $.ajax({
+                url: '/get_button_enabled',
+                method: 'GET',
+                success: function(response) {
+                    console.log('Error:', response.enabled);
+                    if (response.enabled) {
+                        localStorage.removeItem('buttonDisabled');
+                    } else {
+                        // $('#execute-button').prop('disabled', true);
+                    }
+                },
+                error: function(error) {
+                    console.log('Error:', error);
+                }
+            });
+
+            // 检查按钮的禁用状态
+            if (localStorage.getItem('buttonDisabled') === 'true') {
+                $('#execute-button2').prop('disabled', true);
+            }
+
+
+            $('#execute-button').click(function(){
+                $.ajax({
+                    type: 'POST',
+                    url: '/execute_function',
+                    success: function(response) {
+                        $('#result').html(response.result);
+                    }
+                });
+            });
+
+
+
+            $('#execute-button2').click(function(){
+                $.ajax({
+                    type: 'POST',
+                    url: '/execute_function2',
+                    success: function(response) {
+                        $('#result2').html(response.result);
+                    }
+                });
+
+                $(this).prop('disabled', true);
+                localStorage.setItem('buttonDisabled', 'true');
+            });
+        });
+
+        function updateNumber() {
+            $.ajax({
+                url: '/get_number',
+                method: 'GET',
+                success: function(response) {
+                    $('#number').text(response.number);
+                },
+                error: function(error) {
+                    console.log('Error:', error);
+                }
+            });
+        }
+
+        // 每秒更新一次数字
+        setInterval(updateNumber, 2000);
+
+        // // 页面加载时立即更新一次数字
+        // $(document).ready(function() {
+        //     updateNumber();
+        // });
+
+    </script>
+</body>
+</html>
